@@ -75,11 +75,11 @@ class Starfield {
         }
     }
 
-    fun update(dt: Float) {
-        updateLayer(farStars, dt)
-        updateLayer(midStars, dt)
-        updateLayer(nearStars, dt)
-        updateSpaceObjects(dt)
+    fun update(dt: Float, boost: Float = 0f) {
+        updateLayer(farStars, dt*(1f+boost*0.25f))
+        updateLayer(midStars, dt*(1f+boost))
+        updateLayer(nearStars, dt*(1f+boost*2.5f))
+        updateSpaceObjects(dt*(1f+boost*1.5f))
     }
 
     private fun updateLayer(stars: MutableList<Star>, dt: Float) {
@@ -92,22 +92,22 @@ class Starfield {
         }
     }
 
-    fun draw(canvas: Canvas, calm: Boolean = false) {
+    fun draw(canvas: Canvas, calm: Boolean = false, boost: Float = 0f) {
         if (!calm) drawSpaceObjects(canvas)
-        drawLayer(canvas, farStars, calm)
-        drawLayer(canvas, midStars, calm)
-        drawLayer(canvas, nearStars, calm)
+        drawLayer(canvas, farStars, calm, boost*0.25f)
+        drawLayer(canvas, midStars, calm, boost*0.6f)
+        drawLayer(canvas, nearStars, calm, boost)
     }
 
-    private fun drawLayer(canvas: Canvas, stars: List<Star>, calm: Boolean) {
+    private fun drawLayer(canvas: Canvas, stars: List<Star>, calm: Boolean, boost: Float) {
         for (star in stars) {
             paint.alpha = (star.alpha * if(calm)0.42f else 0.68f).toInt()
             if (calm) {
                 canvas.drawCircle(star.x,star.y,star.radius,paint)
                 continue
             }
-            val streak = (star.speed * BACKGROUND_SPEED_MULTIPLIER * 0.045f)
-                .coerceIn(star.radius * 2f, 34f)
+            val streak = (star.speed * BACKGROUND_SPEED_MULTIPLIER * (0.045f+boost*0.055f))
+                .coerceIn(star.radius * 2f, 34f+boost*56f)
             paint.strokeWidth = star.radius.coerceAtLeast(1f)
             canvas.drawLine(star.x, star.y - streak, star.x, star.y, paint)
         }

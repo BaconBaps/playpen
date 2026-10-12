@@ -2,6 +2,7 @@ package com.mostly.sluggershot
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RadialGradient
@@ -120,6 +121,10 @@ class GameView(context: Context) : View(context) {
     private var bombBlastY = 0f
     private val starfield = Starfield()
     private val retroViewport = RetroViewport()
+    private val combatFlight = CombatFlightEffects()
+    private val combatWorldMatrix = Matrix()
+    private val combatInputInverse = Matrix()
+    private var bombSupplyTimer = 6f
     private val atmosphere by lazy { SceneAtmosphere(resources) }
     private var bossTokens = 0
     private var bossesDefeated = 0
@@ -335,8 +340,15 @@ class GameView(context: Context) : View(context) {
             width.toFloat(), height.toFloat(),
             backgroundPaint
         )
+        canvas.save()
+        combatWorldMatrix.reset()
+        if(gameMode == GameMode.ENEMY) {
+            combatWorldMatrix.set(combatFlight.matrix(width,height,slingshot.x))
+            canvas.concat(combatWorldMatrix)
+        }
         atmosphere.draw(canvas, width, height, if(gameMode == GameMode.TARGET) puzzleCameraY else runTimeSeconds*12f)
-        starfield.draw(canvas, calm = gameMode == GameMode.TARGET)
+        starfield.draw(canvas, calm = gameMode == GameMode.TARGET, boost = if(gameMode == GameMode.ENEMY)combatFlight.intensity else 0f)
+        if(gameMode == GameMode.ENEMY)combatFlight.drawEdgeRush(canvas,width,height)
         drawIndustrialBackdrop(canvas)
 
         canvas.save()
@@ -352,11 +364,14 @@ class GameView(context: Context) : View(context) {
             else 0f
         val shakeStrength = damageShake + bombShake
         if (shakeStrength > 0f) {
-            canvas.translate(
-                randomRange(-shakeStrength, shakeStrength),
-                randomRange(-shakeStrength, shakeStrength)
-            )
+            val shakeX=randomRange(-shakeStrength,shakeStrength)
+            val shakeY=randomRange(-shakeStrength,shakeStrength)
+            canvas.translate(shakeX,shakeY)
+            if(gameMode == GameMode.ENEMY)combatWorldMatrix.preTranslate(shakeX,shakeY)
         }
+
+        if(gameMode == GameMode.ENEMY)combatWorldMatrix.invert(combatInputInverse)
+        else combatInputInverse.reset()
 
         for (wall in arenaWalls) {
             wall.draw(canvas)
@@ -400,6 +415,7 @@ class GameView(context: Context) : View(context) {
         drawBossShots(canvas)
         drawBeamPulse(canvas)
         drawBombBlast(canvas)
+        canvas.restore()
         canvas.restore()
         retroViewport.end(output, width, height)
 
@@ -552,7 +568,12 @@ class GameView(context: Context) : View(context) {
             currentThrust = 0f
             verticalVelocity = 0f
         }
-        starfield.update(dt * if(gameMode == GameMode.TARGET) 0.035f else 0.3f)
+        if(gameMode == GameMode.ENEMY) {
+            combatFlight.update(dt,currentThrust)
+            updateBombSupply(dt)
+        }
+        starfield.update(dt * if(gameMode == GameMode.TARGET) 0.035f else 0.3f,
+            boost = if(gameMode == GameMode.ENEMY)combatFlight.intensity else 0f)
         sounds.updateMusic(dt)
         bombBlastSeconds = (bombBlastSeconds - dt).coerceAtLeast(0f)
         runTimeSeconds += dt
@@ -685,7 +706,8 @@ class GameView(context: Context) : View(context) {
 
         val thrustMultiplier = if (bossBattle) 2f else 1f
         val acceleration =
-            THRUSTER_GRAVITY - THRUSTER_ACCELERATION * thrustMultiplier * currentThrust
+            THRUSTER_GRAVITY - (THRUSTER_GRAVITY +
+                (THRUSTER_ACCELERATION * thrustMultiplier - THRUSTER_GRAVITY) * 4f) * currentThrust
         verticalVelocity += acceleration * dt
         verticalVelocity *= (1f - THRUSTER_DRAG * dt).coerceIn(0f, 1f)
         verticalVelocity = verticalVelocity.coerceIn(-THRUSTER_MAX_UP_SPEED, THRUSTER_MAX_DOWN_SPEED)
@@ -825,6 +847,17 @@ class GameView(context: Context) : View(context) {
             powerUpSpawnTimer =
                 randomRange(POWERUP_MIN_INTERVAL, POWERUP_MAX_INTERVAL) * scarcity
         }
+    }
+
+    private fun updateBombSupply(dt: Float) {
+        if(gameMode != GameMode.ENEMY)return
+        bombSupplyTimer-=dt
+        if(bombSupplyTimer>0f)return
+        if(powerUps.count { it.active && it.type == ShotType.BOMB }<2) {
+            powerUps += PowerUpActor(ShotType.BOMB,
+                randomRange(POWERUP_MARGIN,width.toFloat()-POWERUP_MARGIN),-POWERUP_RADIUS-10f)
+        }
+        bombSupplyTimer=randomRange(12f,18f)
     }
 
     private fun spawnRandomPowerUp() {
@@ -1033,6 +1066,8 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun restoreBossCheckpoint() {
+        combatFlight.reset()
+        bombSupplyTimer=6f
         gameOver = false
         bossBattle = false
         bossSpawnedThisRun = false
@@ -1095,6 +1130,8 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun resetRun() {
+        combatFlight.reset()
+        bombSupplyTimer=6f
         if (bossCheckpointAvailable) {
             restoreBossCheckpoint()
             return
@@ -2057,6 +2094,15 @@ class GameView(context: Context) : View(context) {
             invalidate()
             return true
         }
+        if(gameMode == GameMode.ENEMY) {
+            val worldEvent=MotionEvent.obtain(event)
+            worldEvent.transform(combatInputInverse)
+            try { return handleWorldTouch(worldEvent) } finally { worldEvent.recycle() }
+        }
+        return handleWorldTouch(event)
+    }
+
+    private fun handleWorldTouch(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 touchTracks.clear()
@@ -3328,18 +3374,18 @@ class GameView(context: Context) : View(context) {
         private const val POWERUP_MIN_INTERVAL = 15f
         private const val POWERUP_MAX_INTERVAL = 25f
         private const val BOMB_SPAWN_CHANCE = 0.055f
-        private const val BOMB_WEIGHT = 0.16f
+        private const val BOMB_WEIGHT = 0.48f
         private const val SHIELD_LOW_HULL_WEIGHT = 1.55f
         private const val BASE_POWERUP_WEIGHT = 1.0f
         private const val FUEL_HIGH_WEIGHT = 0.55f
         private const val FUEL_MID_WEIGHT = 1.25f
         private const val FUEL_LOW_WEIGHT = 2.20f
         private const val FUEL_PICKUP_AMOUNT = 0.34f
-        private const val FULL_THRUST_FUEL_SECONDS = 7.5f
+        private const val FULL_THRUST_FUEL_SECONDS = 15f
         private const val THRUSTER_ACCELERATION = 790f
         private const val THRUSTER_GRAVITY = 560f
         private const val THRUSTER_DRAG = 1.65f
-        private const val THRUSTER_MAX_UP_SPEED = 660f
+        private const val THRUSTER_MAX_UP_SPEED = 2640f
         private const val THRUSTER_MAX_DOWN_SPEED = 620f
         private const val RIVAL_POWERUP_WEIGHT = 0.18f
         private const val MAX_ACTIVE_PROJECTILES = 180

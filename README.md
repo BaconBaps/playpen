@@ -1,7 +1,7 @@
 # Sluggershot — 16-bit frontier
 
 A native Android space slingshot game with survival combat and a graduated,
-50-level ricochet puzzle campaign. App version 0.4 / version code 4.
+50-level ricochet puzzle campaign. App version 0.5 / version code 5.
 
 ## Download and play
 
@@ -11,7 +11,7 @@ A native Android space slingshot game with survival combat and a graduated,
 Install the APK on Android 8.0 or newer. This is a debug-signed development build.
 If an earlier install used a different signing key, Android requires uninstalling
 that build first. The new APK uses the same signing key as this repo's previous
-v0.2 and v0.3 APKs, so those versions can be updated without losing its saved records.
+earlier APKs, so those versions can be updated without losing its saved records.
 
 ## Puzzle campaign
 
@@ -54,6 +54,27 @@ and brings the camera back without resetting targets. The pause menu offers
 ![Reflected trajectory guide](docs/screenshots/puzzle-ricochet-guide.png)
 ![Campaign selector](docs/screenshots/puzzle-level-selector.png)
 
+## Combat flight speed
+
+Combat now has thrust-driven, layered parallax: nearby stars streak faster than
+faraway stars, pixel debris rushes along the edges, and the exhaust becomes longer
+and brighter. Thrust smoothly zooms the world in by up to 12%, with bounded camera
+vibration and a slight forward shift. Releasing thrust eases the effects back down.
+The HUD stays fixed; aiming and two-finger steering use the inverse camera transform.
+The effects freeze while paused and are disabled in puzzle mode.
+
+Full-thrust upward acceleration and the upward speed limit are four times their
+previous values. Full-thrust fuel use is halved (15 seconds per tank versus 7.5).
+Unpowered gravity, descent limits, and the boss fuel exemption are retained.
+
+Bombs have three times their former weight in the regular pickup pool. A separate
+supply starts six seconds after launching a combat flight, then checks every
+12–18 seconds, including during boss fights. It skips spawning when two bomb
+pickups are already active. This supply is independent of upgrade rarity scaling;
+puzzle mode receives no bomb drops.
+
+![Combat at full thrust](docs/screenshots/combat-full-thrust.png)
+
 ## Visuals and game flow
 
 The visual presentation now uses a consistent 16-bit-inspired arcade style:
@@ -94,7 +115,7 @@ The built APK is app/build/outputs/apk/debug/app-debug.apk. Tests use Robolectri
 native graphics, check sprite palettes/transparency and nearest-neighbour scaling,
 and write screen renders under app/build/flight-previews.
 
-This edition passed 20 automated tests; Android lint reported zero errors and 19
+This edition passed 28 automated tests; Android lint reported zero errors and 18
 warnings. Validation includes all 50 layouts: every target can be reached within its level's
 bounce allowance, with overlapping target paths handled in clearable order. Tests
 also cover the actual first-level firing/completion flow, save/reload, locked level

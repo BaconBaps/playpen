@@ -127,7 +127,8 @@ class Slingshot {
                 (radius+8f)*autoChargeVisualScale,0xFF55EAD4.toInt(),100)
         }
         if(thrust01>0.01f) {
-            val flame=(32f+thrust01*48f)
+            val flame=(38f+thrust01*110f)
+            PixelArt.halo(canvas,x,y+76f,26f+thrust01*34f,0xFFFF9A54.toInt(),100)
             PixelArt.rect(canvas,x-8f,y+65f,x+8f,y+65f+flame,0xFFAF4850.toInt())
             PixelArt.rect(canvas,x-5f,y+65f,x+5f,y+65f+flame*0.75f,0xFFFF9A54.toInt())
             PixelArt.rect(canvas,x-2f,y+65f,x+2f,y+65f+flame*0.45f,0xFFFFD980.toInt())
