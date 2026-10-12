@@ -1,0 +1,11 @@
+# Android and Gradle local state
+.gradle/
+.kotlin/
+.idea/
+**/build/
+local.properties
+*.iml
+*.jks
+*.keystore
+.externalNativeBuild/
+.cxx/
