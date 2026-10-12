@@ -1,7 +1,7 @@
-# Sluggershot — 50-sector puzzle campaign
+# Sluggershot — 16-bit frontier
 
 A native Android space slingshot game with survival combat and a graduated,
-50-level ricochet puzzle campaign. App version 0.3 / version code 3.
+50-level ricochet puzzle campaign. App version 0.4 / version code 4.
 
 ## Download and play
 
@@ -11,7 +11,7 @@ A native Android space slingshot game with survival combat and a graduated,
 Install the APK on Android 8.0 or newer. This is a debug-signed development build.
 If an earlier install used a different signing key, Android requires uninstalling
 that build first. The new APK uses the same signing key as this repo's previous
-v0.2 APK, so that version can be updated without losing its saved records.
+v0.2 and v0.3 APKs, so those versions can be updated without losing its saved records.
 
 ## Puzzle campaign
 
@@ -56,10 +56,24 @@ and brings the camera back without resetting targets. The pause menu offers
 
 ## Visuals and game flow
 
-The renderer remains Android Canvas. A generated nebula artwork layer, subdued
-parallax and vignette, quieter puzzle stars, metallic ship shading, and beveled
-wall surfaces add atmosphere and depth. Clean enemy silhouettes and luminous
-beacons replace the logo/text fragments in the original enemy textures.
+The visual presentation now uses a consistent 16-bit-inspired arcade style:
+
+- Original pixel masters for the player, five enemy types, six bosses, beacons,
+  projectiles, and labelled power-up icons. Each master has at most 16 opaque
+  colours and hard transparency edges.
+- A pixel-art nebula background rendered from a 160×240, 16-colour master with
+  nearest-neighbour scaling and subdued parallax.
+- A low-resolution world framebuffer (200–360 pixels wide, depending on the
+  display) enlarged without bilinear filtering. Physics and input coordinates
+  remain at their original precision; the pixel grid affects presentation only.
+- Tiled metal walls, stepped lighting, block trails, an original 5×7 arcade font,
+  square-edged HUD/menu panels, and a matching pixel-ship launcher icon.
+
+Sprite designs and their palettes are editable in `PixelArt.kt`; the bitmap font
+is in `PixelFont.kt`. The background artwork was restyled for this edition.
+
+![Pixel sprite gallery](docs/screenshots/pixel-sprite-gallery.png)
+
 
 Both modes have pre-flight instructions, pause/resume, and deliberate results.
 Android Back pauses a flight; app backgrounding pauses simulation and audio.
@@ -77,9 +91,10 @@ Configure your SDK path through Android Studio; local.properties is not committe
 ```
 
 The built APK is app/build/outputs/apk/debug/app-debug.apk. Tests use Robolectric
-native graphics and write screen renders under app/build/flight-previews.
+native graphics, check sprite palettes/transparency and nearest-neighbour scaling,
+and write screen renders under app/build/flight-previews.
 
-This build passed 16 automated tests; Android lint reported zero errors and 23
+This edition passed 20 automated tests; Android lint reported zero errors and 19
 warnings. Validation includes all 50 layouts: every target can be reached within its level's
 bounce allowance, with overlapping target paths handled in clearable order. Tests
 also cover the actual first-level firing/completion flow, save/reload, locked level
@@ -87,5 +102,6 @@ selection, recall, replay/reset, ending at level 50, and the original combat flo
 These checks verify reachability and progression; difficulty, performance, audio,
 and touch feel still need physical-device playtesting.
 
-The nebula artwork was generated for this project. Original imported assets and
-their license are retained; earlier development notes are under docs/history.
+The nebula artwork was generated for this project. Existing audio assets and their
+license are retained. Unused legacy ship-image crops were removed; earlier
+development notes and prior assets remain recoverable in Git history.

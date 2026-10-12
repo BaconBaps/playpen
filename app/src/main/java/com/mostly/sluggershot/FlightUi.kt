@@ -5,7 +5,7 @@ import kotlin.math.min
 
 /** A shared, resolution-independent visual language for the flight deck. */
 class FlightUi {
-    private val ink = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val ink = Paint()
     private val cyan = Color.rgb(112, 235, 226)
     private val muted = Color.rgb(140, 163, 183)
     private var scale = 1f
@@ -26,15 +26,16 @@ class FlightUi {
         oy = (h - 800f * scale) / 2f
         c.save(); c.translate(ox, oy); c.scale(scale, scale)
     }
-    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int = Color.WHITE, bold: Boolean = false) {
-        ink.shader = null; ink.style = Paint.Style.FILL; ink.color = color
-        ink.typeface = Typeface.create("sans-serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
-        ink.textSize = size; ink.textAlign = Paint.Align.LEFT
-        c.drawText(s, x, y, ink)
+    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int = Color.WHITE, bold: Boolean = false, maxWidth: Float = (380f-x).coerceAtLeast(20f)) {
+        PixelFont.draw(c,s,x,y,size,color,maxWidth)
     }
     private fun rect(c: Canvas, r: RectF, color: Int, radius: Float = 16f) {
         ink.shader = null; ink.style = Paint.Style.FILL; ink.color = color
-        c.drawRoundRect(r, radius, radius, ink)
+        c.drawRect(r,ink)
+        ink.color=0x6655EAD4
+        c.drawRect(r.left,r.top,r.right,r.top+2f,ink)
+        ink.color=0xAA07101F.toInt()
+        c.drawRect(r.left,r.bottom-3f,r.right,r.bottom,ink)
     }
     private fun line(c: Canvas, x: Float, y: Float, xx: Float, yy: Float, color: Int, weight: Float = 1f) {
         ink.shader = null; ink.style = Paint.Style.STROKE; ink.color = color; ink.strokeWidth = weight
@@ -45,36 +46,26 @@ class FlightUi {
         rect(c, r, if (pressed == key) Color.rgb(70, 121, 132) else if (primary) cyan else Color.rgb(24, 40, 57))
         val color = if (primary) Color.rgb(8, 24, 34) else Color.WHITE
         text(c, title, 48f, y + 31f, 18f, color, true)
-        text(c, sub, 48f, y + 54f, 12f, if (primary) Color.rgb(27, 69, 76) else muted)
+        text(c, sub, 48f, y + 54f, 12f, if (primary) Color.rgb(27, 69, 76) else muted, maxWidth=276f)
         text(c, "›", 340f, y + 44f, 28f, color)
     }
-    fun title(c: Canvas, w: Int, h: Int, best: Int, time: Float) {
-        c.drawColor(Color.rgb(7, 15, 27)); begin(c, w, h)
-        ink.shader = RadialGradient(250f, 280f, 300f, intArrayOf(Color.rgb(22, 59, 76), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, 400f, 800f, ink); ink.shader = null
+    fun title(c: Canvas, w: Int, h: Int, best: Int, time: Float, backdrop: SceneAtmosphere?=null) {
+        c.drawColor(Color.rgb(7,15,27))
+        backdrop?.draw(c,w,h,0f)
+        begin(c,w,h)
         // Deterministic star positions: no per-frame randomness or texture assets.
         repeat(70) { i ->
             ink.color = if (i % 4 == 0) 0x99BCE9ED.toInt() else 0x445C809D
-            c.drawCircle(((i * 137 + 17) % 400).toFloat(), ((i * 97 + 31) % 800).toFloat(), if (i % 4 == 0) 1.3f else 0.7f, ink)
+            val x=((i*137+17)%400).toFloat();val y=((i*97+31)%800).toFloat()
+            c.drawRect(x,y,x+2f,y+2f,ink)
         }
         text(c, "S / S     FLIGHT OPERATIONS", 28f, 48f, 11f, cyan, true)
         text(c, "SLUGGER", 28f, 113f, 47f, Color.WHITE, true)
         text(c, "SHOT", 28f, 161f, 47f, Color.WHITE, true)
         text(c, "ONE PULL. A THOUSAND POSSIBILITIES.", 30f, 188f, 10f, muted)
-        c.save(); c.translate(224f, 302f); c.rotate(-24f)
-        ink.style = Paint.Style.STROKE; ink.strokeWidth = 1f; ink.color = 0x335EC9D4
-        c.drawOval(RectF(-145f, -75f, 145f, 75f), ink)
-        c.drawOval(RectF(-118f, -108f, 118f, 108f), ink)
-        val p = Path().apply { moveTo(0f, -65f); lineTo(44f, 48f); lineTo(0f, 30f); lineTo(-44f, 48f); close() }
-        ink.style = Paint.Style.FILL; ink.color = Color.rgb(42, 65, 85); c.drawPath(p, ink)
-        ink.style = Paint.Style.STROKE; ink.strokeWidth = 2f; ink.color = cyan; c.drawPath(p, ink)
-        line(c, 0f, -45f, 0f, 20f, Color.WHITE, 3f)
-        val pulse = 18f + kotlin.math.sin(time * 3f) * 4f
-        ink.style = Paint.Style.FILL
-        ink.shader = RadialGradient(0f, 50f, 48f, cyan, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        c.drawCircle(0f, 50f, 48f, ink); ink.shader = null
-        line(c, -9f, 36f, 0f, 54f + pulse, cyan, 4f); line(c, 9f, 36f, 0f, 54f + pulse, cyan, 4f)
-        c.restore()
+        PixelArt.halo(c,224f,300f,112f,0xFF297DA1.toInt(),70)
+        PixelArt.draw(c,"player",224f,296f,144f)
+        text(c,"16-BIT FRONTIER",28f,379f,10f,cyan,true)
         text(c, "PICK YOUR FLIGHT", 28f, 428f, 11f, muted, true)
         button(c, "combat", "Into the frontier", "SURVIVAL  /  upgrades, encounters & bosses", 449f, true)
         button(c, "puzzle", "Find your angle", "PUZZLES  /  50 sectors, from novice to expert", 539f)

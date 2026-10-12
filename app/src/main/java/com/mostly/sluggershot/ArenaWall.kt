@@ -1,56 +1,19 @@
 package com.mostly.sluggershot
 
 import android.graphics.Canvas
-import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.LinearGradient
-import android.graphics.Shader
-import android.graphics.Matrix
 import kotlin.math.abs
 import kotlin.math.sqrt
 
 class ArenaWall(
     val rect: RectF
 ) {
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF172A38.toInt()
-    }
-    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF476D7C.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
-    }
-
-    private val surfaceShader = LinearGradient(0f,0f,0f,rect.height().coerceAtLeast(1f),
-        intArrayOf(0xFF436275.toInt(),0xFF1C3345.toInt(),0xFF102331.toInt()),
-        floatArrayOf(0f,0.28f,1f),Shader.TileMode.CLAMP)
-    private val surfaceMatrix=Matrix()
-    private val shadowRect=RectF()
-    private val shadowPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xAA020A13.toInt() }
-    private val bevelPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xAA9DC6D0.toInt(); strokeWidth=2f }
-    private val rivetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF70A4AE.toInt() }
-
     fun scrollBy(dy: Float) {
         rect.offset(0f, dy)
     }
 
     fun draw(canvas: Canvas) {
-        shadowRect.set(rect); shadowRect.offset(5f,7f)
-        canvas.drawRoundRect(shadowRect,6f,6f,shadowPaint)
-        surfaceMatrix.setTranslate(rect.left,rect.top)
-        surfaceShader.setLocalMatrix(surfaceMatrix)
-        fillPaint.shader=surfaceShader
-        canvas.drawRoundRect(rect, 6f, 6f, fillPaint)
-        canvas.drawLine(rect.left+6f,rect.top+2f,rect.right-6f,rect.top+2f,bevelPaint)
-        canvas.drawRoundRect(rect, 6f, 6f, edgePaint)
-
-        // Rivets make the obstacle read as a heavy fabricated steel member.
-        val inset = 11f
-        val r = 4f
-        canvas.drawCircle(rect.left + inset, rect.top + inset, r, rivetPaint)
-        canvas.drawCircle(rect.right - inset, rect.top + inset, r, rivetPaint)
-        canvas.drawCircle(rect.left + inset, rect.bottom - inset, r, rivetPaint)
-        canvas.drawCircle(rect.right - inset, rect.bottom - inset, r, rivetPaint)
+        PixelArt.wall(canvas,rect)
     }
 
     fun resolve(projectile: Projectile): Boolean {

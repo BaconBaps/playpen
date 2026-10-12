@@ -1,1 +1,1 @@
-389554c7abbf64bd771185d331abf7969266eb82d5d844eeaa7bd3c8c87b30e8  Sluggershot_debug.apk
+1369312c17e0501c9e71cf9f9f26a15ceebcd57a4bc49213e05159077297a243  Sluggershot_debug.apk

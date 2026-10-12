@@ -1,7 +1,6 @@
 package com.mostly.sluggershot
 
 import android.graphics.Canvas
-import android.graphics.Paint
 import android.graphics.RectF
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -16,40 +15,19 @@ class DestructibleSteel(
     val active: Boolean
         get() = health > 0f
 
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 5f
-    }
-    private val crackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFF8F00.toInt()
-        strokeWidth = 3f
-    }
-
     fun scrollBy(dy: Float) {
         rect.offset(0f, dy)
     }
 
     fun draw(canvas: Canvas) {
-        if (!active) return
-
-        val ratio = (health / maxHealth).coerceIn(0f, 1f)
-        fillPaint.color = when {
-            ratio > 0.66f -> 0xFF34383C.toInt()
-            ratio > 0.33f -> 0xFF4A3E34.toInt()
-            else -> 0xFF5A3022.toInt()
-        }
-        edgePaint.color = if (ratio > 0.33f) 0xFF9EA3A6.toInt() else 0xFFFF8F00.toInt()
-
-        canvas.drawRoundRect(rect, 5f, 5f, fillPaint)
-        canvas.drawRoundRect(rect, 5f, 5f, edgePaint)
-
-        if (ratio < 0.67f) {
-            val cx = rect.centerX()
-            val cy = rect.centerY()
-            canvas.drawLine(cx - 22f, cy - 12f, cx + 4f, cy + 2f, crackPaint)
-            canvas.drawLine(cx + 4f, cy + 2f, cx - 8f, cy + 18f, crackPaint)
-            canvas.drawLine(cx + 4f, cy + 2f, cx + 24f, cy + 14f, crackPaint)
+        if(!active)return
+        val ratio=(health/maxHealth).coerceIn(0f,1f)
+        PixelArt.wall(canvas,rect,ratio)
+        if(ratio<0.67f) {
+            val x=rect.centerX();val y=rect.centerY()
+            PixelArt.rect(canvas,x-12f,y-6f,x+4f,y-2f,0xFFFF9A54.toInt())
+            PixelArt.rect(canvas,x,y-2f,x+4f,y+10f,0xFFFF9A54.toInt())
+            PixelArt.rect(canvas,x-8f,y+10f,x+4f,y+14f,0xFFAF4850.toInt())
         }
     }
 

@@ -2,10 +2,6 @@ package com.mostly.sluggershot
 
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.LinearGradient
-import android.graphics.Shader
-import android.graphics.Matrix
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -27,35 +23,7 @@ class Slingshot {
     private var recoil = 0f
     private var recoilVelocity = 0f
 
-    private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF8D9398.toInt()
-        strokeWidth = 24f
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    private val elasticPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF70EBE2.toInt()
-        strokeWidth = 10f
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    private val pouchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF303236.toInt()
-    }
-
-    private val loadedProjectilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFE0E0E0.toInt()
-    }
-
-    private val jointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF4A4E52.toInt()
-    }
-
-    private val hotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF70EBE2.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = 5f
-    }
+    private val elasticPaint=Paint()
 
     fun initialise(screenWidth: Float, screenHeight: Float) {
         x = screenWidth / 2f
@@ -138,145 +106,31 @@ class Slingshot {
         if (isPulled) y + pullY else y - 20f + recoil
 
 
-    private val shuttlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF16A34A.toInt()
-    }
-    private val shuttleDarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF075E2C.toInt()
-    }
-    private val shuttleHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF92CFC7.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
-    }
-    private val canopyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF123A4A.toInt()
-    }
-    private val enginePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF263238.toInt()
-    }
-    private val exhaustPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF69F0AE.toInt()
-    }
-
-    private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF426769.toInt()
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
-    }
-    private val metalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFB0BEC5.toInt()
-    }
-    private val cyanPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF64D8FF.toInt()
-    }
-    private val hotExhaustPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFF4FF81.toInt()
-    }
-
-    private val hullShader = LinearGradient(-66f,-72f,66f,76f,
-        intArrayOf(0xFF91B8AD.toInt(),0xFF426E68.toInt(),0xFF163D43.toInt()),
-        floatArrayOf(0f,0.45f,1f),Shader.TileMode.CLAMP)
-    private val bodyShader = LinearGradient(-21f,0f,21f,0f,
-        intArrayOf(0xFF284F50.toInt(),0xFF90B9AF.toInt(),0xFF234149.toInt()),
-        floatArrayOf(0f,0.45f,1f),Shader.TileMode.CLAMP)
-    private val hullMatrix=Matrix()
-    private val shadowPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xAA010911.toInt() }
-
     fun draw(canvas: Canvas, heavyLoaded: Boolean, thrust01: Float = 0f, autoChargeVisualScale: Float = 1f) {
-
-        val leftForkX = x - 42f
-        val rightForkX = x + 42f
-        val forkY = y - 88f
-        val pouchX = getPouchX()
-        val pouchY = getPouchY() - 24f
-
-        // Green top-down shuttle: broad delta wings, compact fuselage, dark canopy.
-        val shuttle = Path().apply {
-            moveTo(x, y - 68f)
-            lineTo(x + 23f, y - 20f)
-            lineTo(x + 66f, y + 42f)
-            lineTo(x + 24f, y + 30f)
-            lineTo(x + 16f, y + 76f)
-            lineTo(x, y + 64f)
-            lineTo(x - 16f, y + 76f)
-            lineTo(x - 24f, y + 30f)
-            lineTo(x - 66f, y + 42f)
-            lineTo(x - 23f, y - 20f)
-            close()
+        PixelArt.draw(canvas,"player",x,y,144f)
+        repeat(2) { i ->
+            val dx=if(i==0)-42f else 42f
+            PixelArt.rect(canvas,x+dx-3f,y-88f,x+dx+3f,y-48f,0xFF31536B.toInt())
+            PixelArt.rect(canvas,x+dx-7f,y-94f,x+dx+7f,y-82f,0xFF07101F.toInt())
+            PixelArt.rect(canvas,x+dx-5f,y-92f,x+dx+5f,y-84f,0xFF709DA5.toInt())
+            PixelArt.rect(canvas,x+dx-2f,y-90f,x+dx+2f,y-86f,0xFF55EAD4.toInt())
         }
-        canvas.save(); canvas.translate(5f,7f); canvas.drawPath(shuttle,shadowPaint); canvas.restore()
-        hullMatrix.setTranslate(x,y)
-        hullShader.setLocalMatrix(hullMatrix); bodyShader.setLocalMatrix(hullMatrix)
-        shuttleDarkPaint.shader=hullShader; shuttlePaint.shader=bodyShader
-        canvas.drawPath(shuttle, shuttleDarkPaint)
-        val fuselage = Path().apply {
-            moveTo(x, y - 72f)
-            lineTo(x + 21f, y + 54f)
-            lineTo(x, y + 72f)
-            lineTo(x - 21f, y + 54f)
-            close()
+        val pouchX=getPouchX();val pouchY=getPouchY()-24f
+        if(isPulled) {
+            elasticPaint.isAntiAlias=false;elasticPaint.strokeWidth=4f
+            elasticPaint.color=0xFF55EAD4.toInt()
+            canvas.drawLine(x-42f,y-88f,pouchX,pouchY,elasticPaint)
+            canvas.drawLine(x+42f,y-88f,pouchX,pouchY,elasticPaint)
+            val radius=if(heavyLoaded)PROJECTILE_RADIUS*HEAVY_RADIUS_MULTIPLIER else PROJECTILE_RADIUS
+            PixelArt.draw(canvas,"shot",pouchX,pouchY-radius-3f,radius*2f)
+            if(rawPullDistance>=MAX_PULL_DISTANCE)PixelArt.halo(canvas,pouchX,pouchY-radius-3f,
+                (radius+8f)*autoChargeVisualScale,0xFF55EAD4.toInt(),100)
         }
-        canvas.drawPath(fuselage, shuttlePaint)
-        canvas.drawPath(shuttle, shuttleHighlightPaint)
-        canvas.drawOval(x - 12f, y - 34f, x + 12f, y - 2f, canopyPaint)
-        canvas.drawOval(x - 7f, y - 29f, x + 7f, y - 9f, cyanPaint)
-
-        // Forged panel seams, wing hardware and twin auxiliary engine bells.
-        canvas.drawLine(x, y - 60f, x, y + 52f, panelPaint)
-        canvas.drawLine(x - 43f, y + 27f, x - 18f, y + 18f, panelPaint)
-        canvas.drawLine(x + 43f, y + 27f, x + 18f, y + 18f, panelPaint)
-        canvas.drawCircle(x - 28f, y + 39f, 6f, metalPaint)
-        canvas.drawCircle(x + 28f, y + 39f, 6f, metalPaint)
-        canvas.drawCircle(x, y + 61f, 13f, enginePaint)
-        canvas.drawCircle(x, y + 61f, 6f, cyanPaint)
-
-        if (thrust01 > 0.01f) {
-            val flame = Path().apply {
-                moveTo(x - 10f, y + 70f)
-                lineTo(x, y + 76f + 62f * thrust01)
-                lineTo(x + 10f, y + 70f)
-                close()
-            }
-            exhaustPaint.alpha = (150 + 105 * thrust01).toInt()
-            canvas.drawPath(flame, exhaustPaint)
-
-            val core = Path().apply {
-                moveTo(x - 5f, y + 70f)
-                lineTo(x, y + 75f + 39f * thrust01)
-                lineTo(x + 5f, y + 70f)
-                close()
-            }
-            hotExhaustPaint.alpha = (170 + 85 * thrust01).toInt()
-            canvas.drawPath(core, hotExhaustPaint)
-        }
-
-        // Slingshot mechanism is bolted onto the shuttle nose.
-        canvas.drawLine(leftForkX, forkY, pouchX, pouchY, elasticPaint)
-        canvas.drawLine(rightForkX, forkY, pouchX, pouchY, elasticPaint)
-        canvas.drawLine(leftForkX, forkY, x - 15f, y - 42f, framePaint)
-        canvas.drawLine(rightForkX, forkY, x + 15f, y - 42f, framePaint)
-        canvas.drawCircle(leftForkX, forkY, 13f, jointPaint)
-        canvas.drawCircle(rightForkX, forkY, 13f, jointPaint)
-        canvas.drawCircle(pouchX, pouchY, 18f, pouchPaint)
-
-        if (isPulled) {
-            val radius =
-                if (heavyLoaded) PROJECTILE_RADIUS * HEAVY_RADIUS_MULTIPLIER
-                else PROJECTILE_RADIUS
-
-            val projectileY = pouchY - radius - 3f
-            canvas.drawCircle(pouchX, projectileY, radius, loadedProjectilePaint)
-            canvas.drawCircle(pouchX, projectileY, radius * 0.42f, jointPaint)
-
-            if (rawPullDistance >= MAX_PULL_DISTANCE) {
-                canvas.drawCircle(
-                    pouchX,
-                    projectileY,
-                    (radius + 8f) * autoChargeVisualScale.coerceIn(0f, 1f),
-                    hotPaint
-                )
-            }
+        if(thrust01>0.01f) {
+            val flame=(32f+thrust01*48f)
+            PixelArt.rect(canvas,x-8f,y+65f,x+8f,y+65f+flame,0xFFAF4850.toInt())
+            PixelArt.rect(canvas,x-5f,y+65f,x+5f,y+65f+flame*0.75f,0xFFFF9A54.toInt())
+            PixelArt.rect(canvas,x-2f,y+65f,x+2f,y+65f+flame*0.45f,0xFFFFD980.toInt())
         }
     }
 

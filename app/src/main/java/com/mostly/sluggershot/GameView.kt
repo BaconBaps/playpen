@@ -1,7 +1,6 @@
 package com.mostly.sluggershot
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -120,26 +119,8 @@ class GameView(context: Context) : View(context) {
     private var bombBlastX = 0f
     private var bombBlastY = 0f
     private val starfield = Starfield()
+    private val retroViewport = RetroViewport()
     private val atmosphere by lazy { SceneAtmosphere(resources) }
-    private val enemySprites by lazy {
-        listOf(
-            BitmapFactory.decodeResource(resources, R.drawable.enemy_scout_3d),
-            BitmapFactory.decodeResource(resources, R.drawable.enemy_raider_3d),
-            BitmapFactory.decodeResource(resources, R.drawable.enemy_mine_3d),
-            BitmapFactory.decodeResource(resources, R.drawable.enemy_guard_3d),
-            BitmapFactory.decodeResource(resources, R.drawable.enemy_interceptor_3d)
-        )
-    }
-    private val bossSprites by lazy {
-        listOf(
-            BitmapFactory.decodeResource(resources, R.drawable.boss_dreadnought),
-            BitmapFactory.decodeResource(resources, R.drawable.boss_orbital_core),
-            BitmapFactory.decodeResource(resources, R.drawable.boss_void_leviathan),
-            BitmapFactory.decodeResource(resources, R.drawable.boss_asteroid),
-            BitmapFactory.decodeResource(resources, R.drawable.boss_sentinel),
-            BitmapFactory.decodeResource(resources, R.drawable.boss_hive)
-        )
-    }
     private var bossTokens = 0
     private var bossesDefeated = 0
     private val arenaWalls = mutableListOf<ArenaWall>()
@@ -321,8 +302,8 @@ class GameView(context: Context) : View(context) {
             )
     }
 
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
+    override fun onDraw(output: Canvas) {
+        super.onDraw(output)
 
         val now = System.nanoTime()
         var dt = (now - lastFrameTime) / 1_000_000_000f
@@ -331,11 +312,13 @@ class GameView(context: Context) : View(context) {
 
         if (titleScreen) {
             titleTime += dt
-            if (puzzleSelection) flightUi.levelSelection(canvas, width, height, puzzleUnlocked, puzzleCompleted)
-            else flightUi.title(canvas, width, height, bestFlight, titleTime)
+            if (puzzleSelection) flightUi.levelSelection(output, width, height, puzzleUnlocked, puzzleCompleted)
+            else flightUi.title(output, width, height, bestFlight, titleTime, atmosphere)
             postInvalidateOnAnimation()
             return
         }
+
+        val canvas = retroViewport.begin(width, height)
 
         if (flightScreen == FlightScreen.PLAYING && !gameOver) {
             updateChargeMeter(dt)
@@ -385,8 +368,6 @@ class GameView(context: Context) : View(context) {
             drawTrajectoryGuide(canvas)
         }
 
-        if (gameMode == GameMode.ENEMY) {
-        }
         val autoChargeVisualScale =
             if (autoChargeActive) chargeEnergy.coerceIn(0f, 1f) else 1f
         slingshot.draw(
@@ -420,16 +401,17 @@ class GameView(context: Context) : View(context) {
         drawBeamPulse(canvas)
         drawBombBlast(canvas)
         canvas.restore()
+        retroViewport.end(output, width, height)
 
-        if (bossIntroActive) drawBossIntro(canvas)
-        flightUi.hud(canvas, width, height, gameMode == GameMode.TARGET,
+        if (bossIntroActive) drawBossIntro(output)
+        flightUi.hud(output, width, height, gameMode == GameMode.TARGET,
             playerHealth, playerMaxHealth, fuel, runTimeSeconds.toInt(),
             enemies.count { it.active }, puzzleLevel,
             if (activeShotType == ShotType.BEAM) "BEAM" else collectedPowerUps.joinToString(" + ") { it.label }.ifEmpty { "STANDARD / COLLECT UPGRADES" },
             bombInventory, puzzleLayout?.level, projectiles.any { it.active })
-        drawDamageFeedback(canvas)
+        drawDamageFeedback(output)
         val liveBoss = enemies.firstOrNull { it.active && it.boss }
-        flightUi.encounter(canvas,
+        flightUi.encounter(output,
             if (bossMessageSeconds > 0f) bossMessage else "",
             if (bossBattle && !bossIntroActive && liveBoss != null) liveBoss.hitPoints / liveBoss.maxHitPoints else null)
         if (flightScreen != FlightScreen.PLAYING) {
@@ -439,7 +421,7 @@ class GameView(context: Context) : View(context) {
                 FlightScreen.COMPLETE -> if (gameMode == GameMode.TARGET && puzzleLevel == PuzzleCampaign.LEVEL_COUNT) "campaign" else "complete"
                 else -> "result"
             }
-            flightUi.overlay(canvas, width, height, kind, gameMode == GameMode.TARGET,
+            flightUi.overlay(output, width, height, kind, gameMode == GameMode.TARGET,
                 runTimeSeconds.toInt(), volleysLaunched, puzzleLevel, bossCheckpointAvailable, puzzleLayout?.level)
         }
 
@@ -1270,7 +1252,7 @@ class GameView(context: Context) : View(context) {
             maxHitPoints = BATTLE_BOSS_HIT_POINTS,
             boss = true,
             bossVariant = bossVariant,
-            sprite = bossSprites[bossVariant]
+            sprite = null
         )
     }
 
@@ -1323,39 +1305,15 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun drawBossIntro(canvas: Canvas) {
-        val elapsed = BOSS_INTRO_SECONDS - bossIntroSeconds
-        val pulse = (0.5f + 0.5f * kotlin.math.sin(elapsed * 9f)).coerceIn(0f, 1f)
-
-        buttonPaint.style = Paint.Style.FILL
-        buttonPaint.color = 0xCC000000.toInt()
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), buttonPaint)
-
-        buttonPaint.color = 0x33FF6D00
-        val band = 80f + pulse * 55f
-        canvas.drawRect(
-            0f, height * 0.36f - band,
-            width.toFloat(), height * 0.36f + band,
-            buttonPaint
-        )
-
-        buttonTextPaint.textAlign = Paint.Align.CENTER
-        buttonTextPaint.typeface = Typeface.DEFAULT_BOLD
-        buttonTextPaint.textSize = 28f
-        buttonTextPaint.color = 0xFFFFB300.toInt()
-        canvas.drawText("WARNING", width * 0.5f, height * 0.29f, buttonTextPaint)
-
-        buttonTextPaint.textSize = (width * 0.085f).coerceAtMost(58f)
-        buttonTextPaint.color = 0xFFFFBA66.toInt()
-        canvas.drawText("BOSS INBOUND", width * 0.5f, height * 0.38f, buttonTextPaint)
-
-        buttonTextPaint.textSize = 25f
-        buttonTextPaint.color = 0xFF69F0AE.toInt()
-        canvas.drawText(
-            "THRUSTERS SUPERCHARGED",
-            width * 0.5f,
-            height * 0.44f,
-            buttonTextPaint
-        )
+        canvas.drawColor(0xCC07101F.toInt())
+        val scale=minOf(width/400f,height/800f)
+        canvas.save();canvas.translate((width-400f*scale)/2f,(height-800f*scale)/2f);canvas.scale(scale,scale)
+        PixelArt.rect(canvas,28f,260f,372f,264f,0xFFFF9A54.toInt())
+        PixelFont.draw(canvas,"WARNING",28f,250f,18f,0xFFFFD980.toInt(),344f)
+        PixelFont.draw(canvas,"BOSS INBOUND",28f,312f,38f,0xFFFF9A54.toInt(),344f)
+        PixelFont.draw(canvas,"THRUSTERS SUPERCHARGED",28f,346f,12f,0xFF55EAD4.toInt(),344f)
+        PixelArt.rect(canvas,28f,365f,372f,369f,0xFFFF9A54.toInt())
+        canvas.restore()
     }
 
     private fun drawBossHealthBar(canvas: Canvas) {
@@ -1493,7 +1451,7 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun createEnemy(x: Float, y: Float): Enemy =
-        createEnemyOfVariant(x, y, Random.nextInt(enemySprites.size))
+        createEnemyOfVariant(x, y, Random.nextInt(PixelArt.ENEMY_VARIANTS))
 
     private fun createEnemyOfVariant(x: Float, y: Float, variant: Int): Enemy =
         Enemy(
@@ -1502,7 +1460,7 @@ class GameView(context: Context) : View(context) {
             y = y,
             radius = ENEMY_RADIUS,
             spriteVariant = variant,
-            sprite = enemySprites[variant]
+            sprite = null
         )
 
     private fun updateBossPowerUps(dt: Float) {
@@ -1633,16 +1591,7 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun drawBossShots(canvas: Canvas) {
-        buttonPaint.style = Paint.Style.FILL
-        for (shot in bossShots) {
-            // Hot hostile plasma: saturated body with a clipped white/yellow core.
-            buttonPaint.color = 0xFFFF3D00.toInt()
-            canvas.drawCircle(shot.x, shot.y, shot.radius, buttonPaint)
-            buttonPaint.color = 0xFFFFD54F.toInt()
-            canvas.drawCircle(shot.x, shot.y, shot.radius * 0.62f, buttonPaint)
-            buttonPaint.color = 0xFFFFFFFF.toInt()
-            canvas.drawCircle(shot.x, shot.y, shot.radius * 0.24f, buttonPaint)
-        }
+        for(shot in bossShots) if(shot.active) PixelArt.draw(canvas,"shot:orange",shot.x,shot.y,shot.radius*2f)
     }
 
     private fun drawRadialLight(
@@ -1653,24 +1602,7 @@ class GameView(context: Context) : View(context) {
         rgb: Int,
         strength: Int
     ) {
-        if (radius <= 1f || strength <= 0) return
-        val r = (rgb shr 16) and 0xFF
-        val g = (rgb shr 8) and 0xFF
-        val b = rgb and 0xFF
-        val a0 = strength.coerceIn(0, 255)
-        val a1 = (a0 * 0.38f).toInt()
-        lightPaint.shader = RadialGradient(
-            x, y, radius,
-            intArrayOf(
-                (a0 shl 24) or (r shl 16) or (g shl 8) or b,
-                (a1 shl 24) or (r shl 16) or (g shl 8) or b,
-                (r shl 16) or (g shl 8) or b
-            ),
-            floatArrayOf(0f, 0.28f, 1f),
-            Shader.TileMode.CLAMP
-        )
-        canvas.drawCircle(x, y, radius, lightPaint)
-        lightPaint.shader = null
+        PixelArt.halo(canvas,x,y,radius,rgb or 0xFF000000.toInt(),strength)
     }
 
     private fun drawDynamicLighting(canvas: Canvas) {

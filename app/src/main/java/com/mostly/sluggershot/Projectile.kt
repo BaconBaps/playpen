@@ -1,7 +1,6 @@
 package com.mostly.sluggershot
 
 import android.graphics.Canvas
-import android.graphics.Paint
 import kotlin.math.abs
 
 class Projectile(
@@ -38,18 +37,6 @@ class Projectile(
     }
 
     fun speed(): Float = kotlin.math.sqrt(vx * vx + vy * vy)
-
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (piercing) 0xFF80DEEA.toInt() else 0xFFE0E0E0.toInt()
-    }
-    private val heatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 4f
-    }
-    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeCap = Paint.Cap.ROUND
-    }
-    private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     fun integrate(dt: Float) {
         if (!active) return
@@ -104,42 +91,19 @@ class Projectile(
     }
 
     fun draw(canvas: Canvas) {
-        if (!active) return
-
-        val shotColor = when {
-            piercing -> 0xFFC86BFF.toInt()
-            bouncy -> 0xFF29B6F6.toInt()
-            else -> 0xFF64D8FF.toInt()
+        if(!active)return
+        val velocity=speed().coerceAtLeast(1f)
+        val nx=vx/velocity;val ny=vy/velocity
+        val color=if(piercing)0xFFCE8FFF.toInt() else 0xFF55EAD4.toInt()
+        for(i in 4 downTo 1) {
+            val offset=radius*i*1.3f
+            val size=radius*(1f-i*0.16f)
+            val alpha=150-i*25
+            PixelArt.rect(canvas,x-nx*offset-size/2f,y-ny*offset-size/2f,
+                x-nx*offset+size/2f,y-ny*offset+size/2f,(alpha shl 24) or (color and 0xFFFFFF))
         }
-        val velocity = speed().coerceAtLeast(1f)
-        val nx = vx / velocity
-        val ny = vy / velocity
-        val trailLength = (radius * 5.8f + velocity * 0.025f).coerceAtMost(radius * 11f)
-
-        // Three-stage luminous trail: broad colour, hot inner streak, white tip.
-        trailPaint.color = shotColor
-        trailPaint.alpha = 58
-        trailPaint.strokeWidth = radius * 2.3f
-        canvas.drawLine(x, y, x - nx * trailLength, y - ny * trailLength, trailPaint)
-        trailPaint.alpha = 150
-        trailPaint.strokeWidth = radius * 0.82f
-        canvas.drawLine(x, y, x - nx * trailLength * 0.72f, y - ny * trailLength * 0.72f, trailPaint)
-
-        paint.color = shotColor
-        paint.alpha = 255
-        canvas.drawCircle(x, y, radius, paint)
-        corePaint.color = 0xFFFFFFFF.toInt()
-        canvas.drawCircle(x, y, radius * 0.42f, corePaint)
-        corePaint.color = 0xFFE8FFFF.toInt()
-        canvas.drawCircle(x - nx * radius * 0.10f, y - ny * radius * 0.10f, radius * 0.22f, corePaint)
-
-        if (bounceCount > 0) {
-            heatPaint.color =
-                if (bounceCount >= 3) 0xFFFF3D00.toInt()
-                else 0xFFFF8F00.toInt()
-            heatPaint.alpha = (100 + bounceCount * 38).coerceAtMost(255)
-            canvas.drawCircle(x, y, radius + 5f + bounceCount * 2f, heatPaint)
-        }
+        PixelArt.draw(canvas,if(piercing)"shot:purple" else "shot",x,y,radius*2f)
+        if(bounceCount>0)PixelArt.halo(canvas,x,y,radius+4f+bounceCount*2f,0xFFFF9A54.toInt(),90)
     }
 
     companion object {
