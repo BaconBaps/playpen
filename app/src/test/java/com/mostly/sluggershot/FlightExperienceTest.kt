@@ -70,7 +70,7 @@ class FlightExperienceTest {
     }
 
     @Test fun puzzleCompletionRequiresNextAndReturnsToBriefing() {
-        val g = game(); g.tap(100f,570f); g.tap(100f,500f)
+        val g = game(); g.tap(100f,570f); g.tap(55f,225f); g.tap(100f,500f)
         @Suppress("UNCHECKED_CAST")
         (value(g,"enemies") as MutableList<Enemy>).clear()
         set(g,"puzzleResetDelay",1f)
@@ -84,7 +84,7 @@ class FlightExperienceTest {
     }
 
     @Test fun newCombatFlightDoesNotInheritDeadHullBossOrPuzzlePosition() {
-        val g = game(); g.tap(100f,570f); g.tap(100f,500f)
+        val g = game(); g.tap(100f,570f); g.tap(55f,225f); g.tap(100f,500f)
         g.pauseFlight(); g.render(); g.tap(100f,600f)
         assertTrue(g.isAtFlightDeck())
         set(g,"playerHealth",0); set(g,"bossCheckpointAvailable",true); set(g,"bossBattle",true)

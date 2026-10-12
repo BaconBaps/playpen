@@ -120,6 +120,7 @@ class GameView(context: Context) : View(context) {
     private var bombBlastX = 0f
     private var bombBlastY = 0f
     private val starfield = Starfield()
+    private val atmosphere by lazy { SceneAtmosphere(resources) }
     private val enemySprites by lazy {
         listOf(
             BitmapFactory.decodeResource(resources, R.drawable.enemy_scout_3d),
@@ -163,6 +164,12 @@ class GameView(context: Context) : View(context) {
     private var puzzleCameraY = 0f
     private var puzzleWorldHeight = 0f
     private var puzzleLevel = 1
+    private var puzzleSelection = false
+    private var puzzleUnlocked = records.getInt("puzzle_unlocked", 1).coerceIn(1, PuzzleCampaign.LEVEL_COUNT)
+    private var puzzleCompleted = records.getInt("puzzle_completed", 0).coerceIn(0, PuzzleCampaign.LEVEL_COUNT)
+    private var puzzleLayout: PuzzleCampaign.Layout? = null
+    private var guideCacheKey = ""
+    private var guideCache = emptyList<PuzzleTrajectory.Point>()
     private var puzzleResetDelay = 0f
     private val titleShootingButton = RectF()
     private val titlePuzzleButton = RectF()
@@ -211,7 +218,7 @@ class GameView(context: Context) : View(context) {
     }
 
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x10395B74
+        color = 0x08395B74
         strokeWidth = 2f
     }
     private val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -324,14 +331,15 @@ class GameView(context: Context) : View(context) {
 
         if (titleScreen) {
             titleTime += dt
-            flightUi.title(canvas, width, height, bestFlight, titleTime)
+            if (puzzleSelection) flightUi.levelSelection(canvas, width, height, puzzleUnlocked, puzzleCompleted)
+            else flightUi.title(canvas, width, height, bestFlight, titleTime)
             postInvalidateOnAnimation()
             return
         }
 
         if (flightScreen == FlightScreen.PLAYING && !gameOver) {
             updateChargeMeter(dt)
-            updateChargeState()
+            if (gameMode == GameMode.ENEMY) updateChargeState()
             updateAutoFire(dt)
             updateGame(dt)
         }
@@ -344,7 +352,8 @@ class GameView(context: Context) : View(context) {
             width.toFloat(), height.toFloat(),
             backgroundPaint
         )
-        starfield.draw(canvas)
+        atmosphere.draw(canvas, width, height, if(gameMode == GameMode.TARGET) puzzleCameraY else runTimeSeconds*12f)
+        starfield.draw(canvas, calm = gameMode == GameMode.TARGET)
         drawIndustrialBackdrop(canvas)
 
         canvas.save()
@@ -417,7 +426,7 @@ class GameView(context: Context) : View(context) {
             playerHealth, playerMaxHealth, fuel, runTimeSeconds.toInt(),
             enemies.count { it.active }, puzzleLevel,
             if (activeShotType == ShotType.BEAM) "BEAM" else collectedPowerUps.joinToString(" + ") { it.label }.ifEmpty { "STANDARD / COLLECT UPGRADES" },
-            bombInventory)
+            bombInventory, puzzleLayout?.level, projectiles.any { it.active })
         drawDamageFeedback(canvas)
         val liveBoss = enemies.firstOrNull { it.active && it.boss }
         flightUi.encounter(canvas,
@@ -427,11 +436,11 @@ class GameView(context: Context) : View(context) {
             val kind = when (flightScreen) {
                 FlightScreen.BRIEFING -> "briefing"
                 FlightScreen.PAUSED -> "pause"
-                FlightScreen.COMPLETE -> "complete"
+                FlightScreen.COMPLETE -> if (gameMode == GameMode.TARGET && puzzleLevel == PuzzleCampaign.LEVEL_COUNT) "campaign" else "complete"
                 else -> "result"
             }
             flightUi.overlay(canvas, width, height, kind, gameMode == GameMode.TARGET,
-                runTimeSeconds.toInt(), volleysLaunched, puzzleLevel, bossCheckpointAvailable)
+                runTimeSeconds.toInt(), volleysLaunched, puzzleLevel, bossCheckpointAvailable, puzzleLayout?.level)
         }
 
         if (flightScreen == FlightScreen.PLAYING) postInvalidateOnAnimation()
@@ -561,7 +570,7 @@ class GameView(context: Context) : View(context) {
             currentThrust = 0f
             verticalVelocity = 0f
         }
-        starfield.update(dt)
+        starfield.update(dt * if(gameMode == GameMode.TARGET) 0.035f else 0.3f)
         sounds.updateMusic(dt)
         bombBlastSeconds = (bombBlastSeconds - dt).coerceAtLeast(0f)
         runTimeSeconds += dt
@@ -1191,54 +1200,19 @@ class GameView(context: Context) : View(context) {
         bossIntroActive = false
         bossSpawnedThisRun = false
         bossMusicFadeStarted = false
-        puzzleWorldHeight = h * 4f
-        puzzleCameraY = puzzleWorldHeight - h
+        val layout = PuzzleCampaign.layout(puzzleLevel, w, h)
+        puzzleLayout = layout
+        guideCacheKey = ""
+        puzzleWorldHeight = layout.height
+        puzzleCameraY = (layout.height-h).coerceAtLeast(0f)
         puzzleResetDelay = 0f
         projectiles.clear()
-
-        // The player begins at the bottom of a four-screen-high puzzle chamber.
-        slingshot.x = w * 0.5f
-        slingshot.y = puzzleWorldHeight - h * 0.20f
-
-        val t = 34f
-        arenaWalls += ArenaWall(RectF(0f, 0f, t, puzzleWorldHeight))
-        arenaWalls += ArenaWall(RectF(w - t, 0f, w, puzzleWorldHeight))
-        arenaWalls += ArenaWall(RectF(0f, 0f, w, t))
-        arenaWalls += ArenaWall(RectF(0f, puzzleWorldHeight - t, w, puzzleWorldHeight))
-
-        // Procedural internal steel creates bank-shot pockets while preserving traversable gaps.
-        val sections = 8
-        for (i in 1 until sections) {
-            val y = puzzleWorldHeight - h * (0.42f + i * 0.40f)
-            if (y < h * 0.25f) continue
-            val fromLeft = (i + puzzleLevel) % 2 == 0
-            val wallW = randomRange(w * 0.38f, w * 0.67f)
-            val wallH = randomRange(34f, 58f)
-            val x = if (fromLeft) 0f else w - wallW
-            arenaWalls += ArenaWall(RectF(x, y, x + wallW, y + wallH))
-            if (i % 3 == 0) {
-                val pillarW = randomRange(34f, 55f)
-                val px = randomRange(w * 0.24f, w * 0.76f - pillarW)
-                arenaWalls += ArenaWall(RectF(px, y - h * 0.22f, px + pillarW, y + h * 0.06f))
-            }
-        }
-
-        val targetCount = 9 + (puzzleLevel % 5)
-        var attempts = 0
-        while (enemies.size < targetCount && attempts++ < 300) {
-            val tx = randomRange(ENEMY_RADIUS + 55f, w - ENEMY_RADIUS - 55f)
-            val ty = randomRange(h * 0.35f, puzzleWorldHeight - h * 0.48f)
-            val blocked = arenaWalls.any { wall ->
-                RectF(wall.rect.left - 70f, wall.rect.top - 70f,
-                      wall.rect.right + 70f, wall.rect.bottom + 70f).contains(tx, ty)
-            }
-            val crowded = enemies.any { e ->
-                val dx=e.x-tx; val dy=e.y-ty; dx*dx+dy*dy < 180f*180f
-            }
-            if (!blocked && !crowded) {
-                enemies += Enemy(nextEnemyId++, tx, ty, ENEMY_RADIUS * 0.72f,
-                    maxHitPoints = 1f, spriteVariant = 0, sprite = null)
-            }
+        slingshot.x = layout.launcherX
+        slingshot.y = layout.launcherY
+        arenaWalls.addAll(layout.walls)
+        layout.targets.forEach { target ->
+            enemies += Enemy(nextEnemyId++, target.x, target.y, layout.targetRadius,
+                maxHitPoints = 1f, spriteVariant = 0, sprite = null)
         }
     }
 
@@ -2587,7 +2561,7 @@ class GameView(context: Context) : View(context) {
 
         if (activeShotType == ShotType.BEAM) {
             sounds.stopBeamLoop()
-            val useCharge = heavyShotCharged && chargeEnergy >= 0.999f
+            val useCharge = gameMode == GameMode.ENEMY && heavyShotCharged && chargeEnergy >= 0.999f
             volleysLaunched++
             fireBeam(pullX, pullY, pullRatio)
             if (useCharge) {
@@ -2597,7 +2571,7 @@ class GameView(context: Context) : View(context) {
             }
             haptics.beamFire()
         } else if (ShotType.AUTO !in collectedPowerUps) {
-            val useCharge = heavyShotCharged && chargeEnergy >= 0.999f
+            val useCharge = gameMode == GameMode.ENEMY && heavyShotCharged && chargeEnergy >= 0.999f
             firePoweredVolley(pullX, pullY, pullRatio, useCharge)
             if (useCharge) {
                 chargeEnergy = 0f
@@ -2626,6 +2600,7 @@ class GameView(context: Context) : View(context) {
         pullRatio: Float,
         heavy: Boolean
     ) {
+        if (gameMode == GameMode.TARGET && projectiles.any { it.active }) return
         volleysLaunched++
         val piercing = ShotType.PIERCING in collectedPowerUps
         val bouncy = ShotType.BOUNCE in collectedPowerUps
@@ -2706,7 +2681,8 @@ class GameView(context: Context) : View(context) {
             if (bouncy) Slingshot.PROJECTILE_RADIUS
             else Slingshot.PROJECTILE_RADIUS * 0.5f
         val radius =
-            if (heavy) normalRadius * Slingshot.HEAVY_RADIUS_MULTIPLIER
+            if (gameMode == GameMode.TARGET) puzzleLayout?.shotRadius ?: normalRadius
+            else if (heavy) normalRadius * Slingshot.HEAVY_RADIUS_MULTIPLIER
             else normalRadius
 
         val spawnOffset = radius + 18f
@@ -2720,7 +2696,11 @@ class GameView(context: Context) : View(context) {
                 vy = ny * speed,
                 radius = radius,
                 piercing = piercing,
-                bouncy = bouncy
+                bouncy = bouncy,
+                bounceLimit = if (gameMode == GameMode.TARGET) PuzzleCampaign.level(puzzleLevel).bounces else Projectile.MAX_BOUNCES - 1,
+                maxLifetimeSeconds = if (gameMode == GameMode.TARGET)
+                    maxOf(12f, (puzzleWorldHeight * 2f + width * PuzzleCampaign.level(puzzleLevel).bounces) / MIN_LAUNCH_SPEED + 2f)
+                    else 5f
             )
         )
     }
@@ -2808,7 +2788,7 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun drawIndustrialBackdrop(canvas: Canvas) {
-        val spacing = 72f
+        val spacing = width / 5f
         var x = 0f
         while (x <= width) {
             canvas.drawLine(x, 0f, x, height.toFloat(), gridPaint)
@@ -2850,6 +2830,43 @@ class GameView(context: Context) : View(context) {
         val nx = -slingshot.pullX / distance
         val ny = -slingshot.pullY / distance
 
+        if (gameMode == GameMode.TARGET) {
+            val layout = puzzleLayout ?: return
+            val key = "$puzzleLevel/$nx/$ny/${enemies.count { it.active }}"
+            if (key != guideCacheKey) {
+                guideCache = PuzzleTrajectory.trace(slingshot.x, slingshot.y-50f, nx, ny,
+                    layout.shotRadius, arenaWalls, height * layout.level.guideScreens,
+                    layout.level.bounces, enemies)
+                guideCacheKey = key
+            }
+            val points = guideCache
+            trajectoryPaint.style = Paint.Style.STROKE
+            trajectoryPaint.strokeWidth = 2f
+            trajectoryPaint.color = 0x5570EBE2
+            for (i in 1 until points.size) {
+                val a=points[i-1]; val b=points[i]
+                canvas.drawLine(a.x,a.y,b.x,b.y,trajectoryPaint)
+            }
+            trajectoryPaint.style = Paint.Style.FILL
+            for (i in points.indices step 4) {
+                val point=points[i]
+                val fade=(1f-i.toFloat()/points.size).coerceAtLeast(0.2f)
+                trajectoryPaint.color = ((fade*210f).toInt() shl 24) or 0x0070EBE2
+                canvas.drawCircle(point.x,point.y,3.2f,trajectoryPaint)
+            }
+            for (i in 1 until points.size) if(points[i].bounces > points[i-1].bounces) {
+                trajectoryPaint.color=0xFFFFBA66.toInt()
+                trajectoryPaint.style=Paint.Style.STROKE
+                canvas.drawCircle(points[i].x,points[i].y,8f,trajectoryPaint)
+                trajectoryPaint.style=Paint.Style.FILL
+            }
+            points.lastOrNull()?.let {
+                trajectoryPaint.color=0xCCFFFFFF.toInt()
+                canvas.drawCircle(it.x,it.y,5f,trajectoryPaint)
+            }
+            return
+        }
+        trajectoryPaint.color=0x9970EBE2.toInt()
         val startX = slingshot.x
         val startY = slingshot.y - 60f
 
@@ -3086,7 +3103,8 @@ class GameView(context: Context) : View(context) {
         gameMode = mode
         bossCheckpointAvailable = false
         activeShotType = ShotType.NONE
-        puzzleLevel = 1
+        puzzleSelection = false
+        if (mode == GameMode.ENEMY) puzzleLevel = 1
         volleysLaunched = 0
         slingshot.initialise(width.toFloat(), height.toFloat())
         resetRun()
@@ -3123,9 +3141,14 @@ class GameView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun isAtFlightDeck(): Boolean = titleScreen
+    fun isAtFlightDeck(): Boolean = titleScreen && !puzzleSelection
 
     fun handleBack() {
+        if (puzzleSelection) {
+            puzzleSelection = false
+            invalidate()
+            return
+        }
         if (titleScreen) return
         if (flightScreen == FlightScreen.PLAYING) pauseFlight() else handleFlightAction("home")
     }
@@ -3133,7 +3156,22 @@ class GameView(context: Context) : View(context) {
     private fun handleFlightAction(action: String) {
         when (action) {
             "combat" -> startFromTitle(GameMode.ENEMY)
-            "puzzle" -> startFromTitle(GameMode.TARGET)
+            "puzzle", "levels" -> {
+                clearFlightInput()
+                sounds.pauseAudio()
+                titleScreen = true
+                puzzleSelection = true
+            }
+            "recall" -> {
+                clearFlightInput()
+                projectiles.clear()
+            }
+            "restart" -> {
+                clearFlightInput()
+                volleysLaunched = 0
+                populateTargetMode(width.toFloat(), height.toFloat())
+                flightScreen = FlightScreen.BRIEFING
+            }
             "pause" -> pauseFlight()
             "bomb" -> detonateBomb()
             "launch", "resume" -> {
@@ -3151,6 +3189,12 @@ class GameView(context: Context) : View(context) {
                 lastFrameTime = System.nanoTime()
             }
             "next" -> {
+                if (puzzleLevel >= PuzzleCampaign.LEVEL_COUNT) {
+                    titleScreen = true
+                    puzzleSelection = true
+                    invalidate()
+                    return
+                }
                 clearFlightInput()
                 puzzleLevel++
                 volleysLaunched = 0
@@ -3162,7 +3206,14 @@ class GameView(context: Context) : View(context) {
                 clearFlightInput()
                 sounds.pauseAudio()
                 titleScreen = true
+                puzzleSelection = false
                 flightScreen = FlightScreen.PLAYING
+            }
+            else -> if (action.startsWith("level:")) {
+                val number = action.substringAfter(":").toIntOrNull() ?: return
+                if (number !in 1..puzzleUnlocked) return
+                puzzleLevel = number
+                startFromTitle(GameMode.TARGET)
             }
         }
         haptics.modeSelected()
@@ -3183,6 +3234,9 @@ class GameView(context: Context) : View(context) {
             if (puzzleResetDelay >= 1.0f) {
                 clearFlightInput()
                 flightScreen = FlightScreen.COMPLETE
+                puzzleCompleted = maxOf(puzzleCompleted, puzzleLevel)
+                puzzleUnlocked = maxOf(puzzleUnlocked, (puzzleLevel+1).coerceAtMost(PuzzleCampaign.LEVEL_COUNT))
+                records.edit().putInt("puzzle_unlocked", puzzleUnlocked).putInt("puzzle_completed", puzzleCompleted).apply()
                 sounds.pauseAudio()
             }
         } else puzzleResetDelay = 0f

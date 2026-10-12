@@ -3,6 +3,9 @@ package com.mostly.sluggershot
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.graphics.Matrix
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -142,9 +145,9 @@ class Slingshot {
         color = 0xFF075E2C.toInt()
     }
     private val shuttleHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF4ADE80.toInt()
+        color = 0xFF92CFC7.toInt()
         style = Paint.Style.STROKE
-        strokeWidth = 4f
+        strokeWidth = 2f
     }
     private val canopyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF123A4A.toInt()
@@ -157,7 +160,7 @@ class Slingshot {
     }
 
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF0B7A3A.toInt()
+        color = 0xFF426769.toInt()
         style = Paint.Style.STROKE
         strokeWidth = 3f
     }
@@ -170,6 +173,15 @@ class Slingshot {
     private val hotExhaustPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFF4FF81.toInt()
     }
+
+    private val hullShader = LinearGradient(-66f,-72f,66f,76f,
+        intArrayOf(0xFF91B8AD.toInt(),0xFF426E68.toInt(),0xFF163D43.toInt()),
+        floatArrayOf(0f,0.45f,1f),Shader.TileMode.CLAMP)
+    private val bodyShader = LinearGradient(-21f,0f,21f,0f,
+        intArrayOf(0xFF284F50.toInt(),0xFF90B9AF.toInt(),0xFF234149.toInt()),
+        floatArrayOf(0f,0.45f,1f),Shader.TileMode.CLAMP)
+    private val hullMatrix=Matrix()
+    private val shadowPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xAA010911.toInt() }
 
     fun draw(canvas: Canvas, heavyLoaded: Boolean, thrust01: Float = 0f, autoChargeVisualScale: Float = 1f) {
 
@@ -193,6 +205,10 @@ class Slingshot {
             lineTo(x - 23f, y - 20f)
             close()
         }
+        canvas.save(); canvas.translate(5f,7f); canvas.drawPath(shuttle,shadowPaint); canvas.restore()
+        hullMatrix.setTranslate(x,y)
+        hullShader.setLocalMatrix(hullMatrix); bodyShader.setLocalMatrix(hullMatrix)
+        shuttleDarkPaint.shader=hullShader; shuttlePaint.shader=bodyShader
         canvas.drawPath(shuttle, shuttleDarkPaint)
         val fuselage = Path().apply {
             moveTo(x, y - 72f)

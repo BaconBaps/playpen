@@ -12,7 +12,9 @@ class Projectile(
     var vy: Float,
     val radius: Float,
     val piercing: Boolean = false,
-    val bouncy: Boolean = false
+    val bouncy: Boolean = false,
+    val bounceLimit: Int = MAX_BOUNCES - 1,
+    val maxLifetimeSeconds: Float = MAX_LIFETIME_SECONDS
 ) {
     var active = true
         private set
@@ -52,7 +54,7 @@ class Projectile(
     fun integrate(dt: Float) {
         if (!active) return
         ageSeconds += dt
-        if (ageSeconds >= MAX_LIFETIME_SECONDS) {
+        if (ageSeconds >= maxLifetimeSeconds) {
             active = false
             return
         }
@@ -91,12 +93,10 @@ class Projectile(
         onBreak: () -> Unit
     ) {
         bounceCount++
-        onBounce()
-
-        if (bounceCount >= MAX_BOUNCES) {
+        if (bounceCount > bounceLimit) {
             active = false
             onBreak()
-        }
+        } else onBounce()
     }
 
     fun deactivate() {

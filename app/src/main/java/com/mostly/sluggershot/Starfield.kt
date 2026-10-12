@@ -92,16 +92,20 @@ class Starfield {
         }
     }
 
-    fun draw(canvas: Canvas) {
-        drawSpaceObjects(canvas)
-        drawLayer(canvas, farStars)
-        drawLayer(canvas, midStars)
-        drawLayer(canvas, nearStars)
+    fun draw(canvas: Canvas, calm: Boolean = false) {
+        if (!calm) drawSpaceObjects(canvas)
+        drawLayer(canvas, farStars, calm)
+        drawLayer(canvas, midStars, calm)
+        drawLayer(canvas, nearStars, calm)
     }
 
-    private fun drawLayer(canvas: Canvas, stars: List<Star>) {
+    private fun drawLayer(canvas: Canvas, stars: List<Star>, calm: Boolean) {
         for (star in stars) {
-            paint.alpha = star.alpha
+            paint.alpha = (star.alpha * if(calm)0.42f else 0.68f).toInt()
+            if (calm) {
+                canvas.drawCircle(star.x,star.y,star.radius,paint)
+                continue
+            }
             val streak = (star.speed * BACKGROUND_SPEED_MULTIPLIER * 0.045f)
                 .coerceIn(star.radius * 2f, 34f)
             paint.strokeWidth = star.radius.coerceAtLeast(1f)
